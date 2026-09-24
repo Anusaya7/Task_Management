@@ -26,7 +26,7 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 4000,
+      serverSelectionTimeoutMS: 8000,
     }
 
     cached.promise = mongoose.connect(MONGODB_URI, opts)
@@ -36,20 +36,25 @@ async function dbConnect() {
       })
       .catch(async (err) => {
         console.warn('⚠️ Could not connect to primary MONGODB_URI:', err.message)
-        console.log('🔄 Launching In-Memory MongoDB Server fallback...')
-        try {
-          const { MongoMemoryServer } = eval('require')('mongodb-memory-server')
-          if (!global.mongoMemoryServer) {
-            global.mongoMemoryServer = await MongoMemoryServer.create()
+        
+        // MongoMemoryServer fallback only in local development (not on Vercel/production)
+        if (process.env.NODE_ENV === 'development' && !process.env.VERCEL) {
+          console.log('🔄 Launching In-Memory MongoDB Server fallback...')
+          try {
+            const { MongoMemoryServer } = eval('require')('mongodb-memory-server')
+            if (!global.mongoMemoryServer) {
+              global.mongoMemoryServer = await MongoMemoryServer.create()
+            }
+            const memoryUri = global.mongoMemoryServer.getUri()
+            console.log('✅ Connected to In-Memory MongoDB:', memoryUri)
+            const conn = await mongoose.connect(memoryUri, { bufferCommands: false })
+            return conn
+          } catch (memErr: any) {
+            console.error('❌ Failed to launch MongoMemoryServer:', memErr.message)
+            throw err
           }
-          const memoryUri = global.mongoMemoryServer.getUri()
-          console.log('✅ Connected to In-Memory MongoDB:', memoryUri)
-          const conn = await mongoose.connect(memoryUri, { bufferCommands: false })
-          return conn
-        } catch (memErr: any) {
-          console.error('❌ Failed to launch MongoMemoryServer:', memErr.message)
-          throw err
         }
+        throw err
       })
   }
 

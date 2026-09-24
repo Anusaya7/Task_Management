@@ -1,46 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '../../../../lib/mongodb'
 import Employee from '../../../../models/Employee'
+import { comparePassword, signToken } from '../../../../lib/auth'
+import { seedDatabase } from '../../../../lib/seed'
 
 export async function POST(request: NextRequest) {
   try {
     await dbConnect()
-    
-    const { username, password, email } = await request.json()
-    
-    if (!password) {
-      return NextResponse.json({ message: 'Password is required' }, { status: 400 })
+
+    // Auto seed database if no employees exist yet
+    try {
+      const count = await Employee.countDocuments()
+      if (count === 0) {
+        await seedDatabase()
+      }
+    } catch (seedErr) {
+      console.warn('Auto-seed check skipped or failed:', seedErr)
     }
-    
-    if (!username && !email) {
-      return NextResponse.json({ message: 'Username or email is required' }, { status: 400 })
+
+    const body = await request.json()
+    const email = (body.email || body.username || '').toLowerCase().trim()
+    const password = body.password
+
+    if (!password || !email) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
-    
-    // Try to find employee by username or email
-    const employee = await Employee.findOne({
-      $or: [
-        { username, password },
-        { email, password }
-      ]
+
+    // Find employee by email or username
+    const user = await Employee.findOne({
+      $or: [{ email }, { username: email }]
     })
-    
-    if (!employee) {
-      return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 })
+
+    if (!user) {
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
-    
-    // Normalize the response
-    const employeeObj = employee.toObject()
-    const normalizedEmployee = {
-      ...employeeObj,
-      id: employeeObj._id,
-      password: undefined
+
+    if (user.status === 'Inactive') {
+      return NextResponse.json({ error: 'Account is inactive. Please contact Director.' }, { status: 403 })
     }
-    
-    return NextResponse.json(normalizedEmployee)
-  } catch (error) {
+
+    let isValid = false
+    if (user.passwordHash) {
+      isValid = await comparePassword(password, user.passwordHash)
+    }
+    if (!isValid && (user as any).password) {
+      isValid = (password === (user as any).password)
+    }
+
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
+    }
+
+    const payload = {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: `${user.firstName} ${user.lastName}`
+    }
+
+    const token = signToken(payload)
+
+    const userObj = user.toObject()
+    const normalizedUser = {
+      ...userObj,
+      id: userObj._id.toString(),
+      _id: userObj._id.toString(),
+      name: `${user.firstName} ${user.lastName}`,
+      password: undefined,
+      passwordHash: undefined
+    }
+
+    const response = NextResponse.json({
+      success: true,
+      token,
+      user: normalizedUser,
+      ...normalizedUser
+    })
+
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60
+    })
+
+    return response
+  } catch (error: any) {
+    console.error('Employees login API error:', error)
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 400 }
+      { error: error?.message || 'Internal server error' },
+      { status: 500 }
     )
   }
 }

@@ -14,25 +14,36 @@ export async function POST(req: Request) {
     }
 
     // Auto seed database if no employees exist yet
-    const count = await Employee.countDocuments()
-    if (count === 0) {
-      await seedDatabase()
+    try {
+      const count = await Employee.countDocuments()
+      if (count === 0) {
+        await seedDatabase()
+      }
+    } catch (seedErr) {
+      console.warn('Auto-seed check skipped or failed:', seedErr)
     }
 
     const cleanEmail = email.toLowerCase().trim()
     const user = await Employee.findOne({ email: cleanEmail })
 
     if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
 
     if (user.status === 'Inactive') {
       return NextResponse.json({ error: 'Account is inactive. Please contact Director.' }, { status: 403 })
     }
 
-    const isValid = await comparePassword(password, user.passwordHash)
+    let isValid = false
+    if (user.passwordHash) {
+      isValid = await comparePassword(password, user.passwordHash)
+    }
+    if (!isValid && (user as any).password) {
+      isValid = (password === (user as any).password)
+    }
+
     if (!isValid) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
 
     const payload = {
@@ -64,12 +75,13 @@ export async function POST(req: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 // 7 days
     })
 
     return response
   } catch (error: any) {
     console.error('Login API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 })
   }
 }
