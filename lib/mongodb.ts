@@ -36,6 +36,7 @@ async function dbConnect() {
       })
       .catch(async (err) => {
         console.warn('⚠️ Could not connect to primary MONGODB_URI:', err.message)
+        cached.promise = null
         
         // MongoMemoryServer fallback only in local development (not on Vercel/production)
         if (process.env.NODE_ENV === 'development' && !process.env.VERCEL) {
