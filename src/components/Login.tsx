@@ -73,7 +73,13 @@ const Login: React.FC = () => {
     try {
       const res = await login(cleanEmail, password)
       if (res.success && res.user) {
-        // Authenticated user role check
+        // Role mismatch security check
+        if (selectedRole !== 'SELECT' && res.user.role !== selectedRole) {
+          setError(`Role Mismatch: You are attempting to sign in to the ${selectedRole} workspace, but your account is registered as ${res.user.role}. Please switch to the ${res.user.role} workspace.`)
+          return
+        }
+
+        // Authenticated user role routing
         if (res.user.role === 'Director') {
           router.push('/director')
         } else if (res.user.role === 'Project Head') {
