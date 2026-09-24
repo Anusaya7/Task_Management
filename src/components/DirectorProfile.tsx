@@ -676,7 +676,7 @@ const DirectorProfile: React.FC = () => {
             margin: 0,
             textAlign: 'center'
           }}>
-            Click "Edit Profile" to change your profile picture
+            Click &quot;Edit Profile&quot; to change your profile picture
           </p>
         )}
         {isEditing && (

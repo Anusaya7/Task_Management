@@ -1372,7 +1372,7 @@ const EmployeeDashboard: React.FC = () => {
                     <div className="py-8 text-center space-y-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                       <FileText className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="text-xs font-bold text-[#0F172A]">No daily work entries yet.</p>
-                      <p className="text-xs text-[#64748B]">Click "+ Add Daily Work" to add your completed work entry.</p>
+                      <p className="text-xs text-[#64748B]">Click &quot;+ Add Daily Work&quot; to add your completed work entry.</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
