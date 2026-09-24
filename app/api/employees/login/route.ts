@@ -99,9 +99,10 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error: any) {
     console.error('Employees login API error:', error)
-    return NextResponse.json(
-      { error: error?.message || 'Internal server error' },
-      { status: 500 }
-    )
+    const errorMsg = error?.message || 'Internal server error'
+    if (errorMsg.includes('ENOTFOUND') || errorMsg.includes('Mongo') || errorMsg.includes('connect')) {
+      return NextResponse.json({ error: 'Database connection error. Please verify MONGODB_URI in Vercel Production Environment Variables.' }, { status: 500 })
+    }
+    return NextResponse.json({ error: errorMsg }, { status: 500 })
   }
 }

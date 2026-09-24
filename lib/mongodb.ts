@@ -26,7 +26,7 @@ async function dbConnect() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 8000,
+      serverSelectionTimeoutMS: (process.env.VERCEL || process.env.NODE_ENV === 'production') ? 10000 : 2000,
     }
 
     cached.promise = mongoose.connect(MONGODB_URI, opts)
